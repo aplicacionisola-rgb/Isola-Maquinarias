@@ -1,0 +1,6 @@
+{
+  "name": "Isola Maquinarias",
+  "description": "Aplicación Progressive Web App (PWA) de gestión de horómetros, combustible y flota de maquinarias para Isola Maquinarias con Firebase y soporte offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

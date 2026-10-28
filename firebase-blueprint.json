@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control for Isola Maquinarias",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID" },
+        "email": { "type": "string", "format": "email", "description": "User email" },
+        "name": { "type": "string", "description": "Full name of the user", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["Administrador", "Supervisor", "Surtidor", "Operador"], "description": "Role in the organization" },
+        "password": { "type": "string", "description": "Credential hash or password for offline/field login" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["email", "name", "role"]
+    },
+    "Equipo": {
+      "title": "Equipo",
+      "description": "Heavy machinery or equipment registered in the fleet",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Equipment identification code", "maxLength": 50 },
+        "brand": { "type": "string", "description": "Manufacturer brand (e.g., Liebherr, Volvo, JAC, Hyundai)", "maxLength": 50 },
+        "type": { "type": "string", "description": "Equipment category (e.g., Grúa, Cargador Frontal, Camión, Furgón)", "maxLength": 50 },
+        "name": { "type": "string", "description": "Full equipment name combining code and brand", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["Operativo", "En Mantenimiento", "Fuera de Servicio"], "description": "Operational status" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["code", "brand", "type", "name"]
+    },
+    "Horometro": {
+      "title": "Horometro",
+      "description": "Daily horometer reading and shift report by equipment operator",
+      "type": "object",
+      "properties": {
+        "registeredAt": { "type": "string", "description": "Auto-registered system timestamp (hidden in UI)" },
+        "date": { "type": "string", "description": "Shift work date (YYYY-MM-DD)" },
+        "shift": { "type": "string", "enum": ["T1", "T2", "T3"], "description": "Shift identifier" },
+        "operatorName": { "type": "string", "description": "Name of the operator from login", "maxLength": 100 },
+        "operatorEmail": { "type": "string", "description": "Operator email" },
+        "operatorId": { "type": "string", "description": "Operator UID" },
+        "equipmentId": { "type": "string", "description": "Associated equipment ID" },
+        "equipmentName": { "type": "string", "description": "Associated equipment name", "maxLength": 100 },
+        "initialHorometer": { "type": "number", "description": "Starting horometer value" },
+        "finalHorometer": { "type": "number", "description": "Ending horometer value" },
+        "totalHours": { "type": "number", "description": "Computed work hours (final - initial)" },
+        "shiftObservation": { "type": "string", "description": "Detailed shift notes and observations", "maxLength": 2000 },
+        "safeEquipmentReport": { "type": "string", "description": "Safety report for the equipment", "maxLength": 2000 },
+        "reportImageUrl": { "type": "string", "description": "Compressed report image (under 1MB)" },
+        "createdAt": { "type": "string", "description": "Timestamp" }
+      },
+      "required": ["date", "shift", "operatorName", "equipmentName", "initialHorometer", "finalHorometer", "totalHours"]
+    },
+    "Combustible": {
+      "title": "Combustible",
+      "description": "Fuel dispatch record entered by fuel provider (surtidor), supervisor or admin",
+      "type": "object",
+      "properties": {
+        "registeredAt": { "type": "string", "description": "Auto-registered system timestamp (hidden in UI)" },
+        "date": { "type": "string", "description": "Date of fuel load (YYYY-MM-DD)" },
+        "fuelLiters": { "type": "number", "description": "Quantity of liters loaded" },
+        "equipmentId": { "type": "string", "description": "Associated equipment ID" },
+        "equipmentName": { "type": "string", "description": "Associated equipment name", "maxLength": 100 },
+        "shiftObservation": { "type": "string", "description": "Shift and load observation", "maxLength": 2000 },
+        "shift": { "type": "string", "enum": ["T1", "T2", "T3"], "description": "Shift identifier" },
+        "recordedByName": { "type": "string", "description": "Name of person who recorded", "maxLength": 100 },
+        "recordedByEmail": { "type": "string", "description": "Email of recorder" },
+        "recordedById": { "type": "string", "description": "UID of recorder" },
+        "createdAt": { "type": "string", "description": "Timestamp" }
+      },
+      "required": ["date", "fuelLiters", "equipmentName"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection with RBAC data"
+    },
+    "/equipos/{equipoId}": {
+      "schema": { "$ref": "#/entities/Equipo" },
+      "description": "Registered machinery fleet equipment"
+    },
+    "/horometros/{horometroId}": {
+      "schema": { "$ref": "#/entities/Horometro" },
+      "description": "Recorded horometer shift log entries"
+    },
+    "/combustible/{combustibleId}": {
+      "schema": { "$ref": "#/entities/Combustible" },
+      "description": "Recorded fuel loading logs"
+    }
+  }
+}
