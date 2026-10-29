@@ -7,11 +7,10 @@ import {
   deleteDoc, 
   updateDoc 
 } from 'firebase/firestore';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { signOut as firebaseSignOut } from 'firebase/auth';
 import { 
   db, 
   auth, 
-  signInWithGooglePopup, 
   handleFirestoreError, 
   OperationType, 
   testFirestoreConnection 
@@ -187,6 +186,8 @@ const INITIAL_COMBUSTIBLE: CombustibleRecord[] = [
   }
 ];
 
+import { safeStorage } from '../utils/storage';
+
 interface AppContextType {
   currentUser: UserProfile | null;
   users: UserProfile[];
@@ -196,8 +197,6 @@ interface AppContextType {
   activeModule: string;
   setActiveModule: (mod: string) => void;
   loginWithEmail: (email: string, password?: string) => Promise<boolean>;
-  loginWithGoogle: () => Promise<void>;
-  switchUserFast: (role: Role) => void;
   logout: () => Promise<void>;
   addUser: (user: Omit<UserProfile, 'uid' | 'createdAt'>) => Promise<void>;
   updateUser: (user: UserProfile) => Promise<void>;
@@ -217,64 +216,64 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Check if there is an active session from an existing login, otherwise null (forces login view)
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('isola_active_user');
-    return saved ? JSON.parse(saved) : INITIAL_USERS[0]; // Default to admin Carlos Mendoza for instant access
+    return safeStorage.getParsedItem<UserProfile | null>('isola_active_user', null);
   });
 
   const [users, setUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('isola_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+    return safeStorage.getParsedItem<UserProfile[]>('isola_users', INITIAL_USERS);
   });
 
   const [equipos, setEquipos] = useState<Equipo[]>(() => {
-    const saved = localStorage.getItem('isola_equipos');
-    return saved ? JSON.parse(saved) : INITIAL_EQUIPOS;
+    return safeStorage.getParsedItem<Equipo[]>('isola_equipos', INITIAL_EQUIPOS);
   });
 
   const [horometros, setHorometros] = useState<HorometroRecord[]>(() => {
-    const saved = localStorage.getItem('isola_horometros');
-    return saved ? JSON.parse(saved) : INITIAL_HOROMETROS;
+    return safeStorage.getParsedItem<HorometroRecord[]>('isola_horometros', INITIAL_HOROMETROS);
   });
 
   const [combustible, setCombustible] = useState<CombustibleRecord[]>(() => {
-    const saved = localStorage.getItem('isola_combustible');
-    return saved ? JSON.parse(saved) : INITIAL_COMBUSTIBLE;
+    return safeStorage.getParsedItem<CombustibleRecord[]>('isola_combustible', INITIAL_COMBUSTIBLE);
   });
 
   const [activeModule, setActiveModule] = useState<string>('horometros-entry');
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
 
-  // Sync to local storage for offline resiliency
+  // Sync to safe storage for offline resiliency
   useEffect(() => {
-    localStorage.setItem('isola_users', JSON.stringify(users));
+    safeStorage.setItem('isola_users', JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem('isola_equipos', JSON.stringify(equipos));
+    safeStorage.setItem('isola_equipos', JSON.stringify(equipos));
   }, [equipos]);
 
   useEffect(() => {
-    localStorage.setItem('isola_horometros', JSON.stringify(horometros));
+    safeStorage.setItem('isola_horometros', JSON.stringify(horometros));
   }, [horometros]);
 
   useEffect(() => {
-    localStorage.setItem('isola_combustible', JSON.stringify(combustible));
+    safeStorage.setItem('isola_combustible', JSON.stringify(combustible));
   }, [combustible]);
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('isola_active_user', JSON.stringify(currentUser));
+      safeStorage.setItem('isola_active_user', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('isola_active_user');
+      safeStorage.removeItem('isola_active_user');
     }
   }, [currentUser]);
 
   // Firestore connection test and listener attachment
   useEffect(() => {
-    testFirestoreConnection().then((connected) => {
-      setIsFirebaseConnected(connected);
-    });
+    testFirestoreConnection()
+      .then((connected) => {
+        setIsFirebaseConnected(connected);
+      })
+      .catch((err) => {
+        console.warn('Initial connection check failed:', err);
+      });
 
     // Subscribe to Firestore users collection
     const unsubUsers = onSnapshot(
@@ -339,35 +338,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
-    // Listen to Firebase Auth state
-    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        // If logged in via Google Auth
-        const existing = users.find(u => u.email.toLowerCase() === firebaseUser.email?.toLowerCase());
-        if (existing) {
-          setCurrentUser(existing);
-        } else {
-          // If master email or newly signed in
-          const isMaster = firebaseUser.email?.toLowerCase() === 'aplicacionisola@gmail.com';
-          const newUser: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario Isola',
-            role: isMaster ? 'Administrador' : 'Operador',
-            createdAt: new Date().toISOString(),
-          };
-          setCurrentUser(newUser);
-          setUsers(prev => [newUser, ...prev]);
-        }
-      }
-    });
-
     return () => {
       unsubUsers();
       unsubEquipos();
       unsubHoros();
       unsubComb();
-      unsubAuth();
     };
   }, []);
 
@@ -381,7 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser?.role]);
 
-  // Login handler
+  // Login handler strictly validating against registered users in the system
   const loginWithEmail = async (email: string, password?: string): Promise<boolean> => {
     const cleanEmail = email.trim().toLowerCase();
     const found = users.find(u => u.email.toLowerCase() === cleanEmail);
@@ -390,10 +365,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error('Contraseña incorrecta');
       }
       setCurrentUser(found);
+      safeStorage.setItem('isola_active_user', JSON.stringify(found));
       return true;
     }
 
-    // Auto-detect master email
+    // Auto-detect master admin email
     if (cleanEmail === 'aplicacionisola@gmail.com') {
       const masterUser: UserProfile = {
         uid: 'admin-master',
@@ -405,38 +381,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setUsers(prev => [masterUser, ...prev]);
       setCurrentUser(masterUser);
+      safeStorage.setItem('isola_active_user', JSON.stringify(masterUser));
       return true;
     }
 
-    throw new Error('Usuario no registrado. Contacte al administrador.');
-  };
-
-  const loginWithGoogle = async () => {
-    const user = await signInWithGooglePopup();
-    if (user && user.email) {
-      const found = users.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-      if (found) {
-        setCurrentUser(found);
-      } else {
-        const isMaster = user.email.toLowerCase() === 'aplicacionisola@gmail.com';
-        const profile: UserProfile = {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName || user.email.split('@')[0],
-          role: isMaster ? 'Administrador' : 'Operador',
-          createdAt: new Date().toISOString()
-        };
-        await addUser(profile);
-        setCurrentUser(profile);
-      }
-    }
-  };
-
-  const switchUserFast = (role: Role) => {
-    const candidate = users.find(u => u.role === role) || INITIAL_USERS.find(u => u.role === role);
-    if (candidate) {
-      setCurrentUser(candidate);
-    }
+    throw new Error('Usuario no registrado. Contacte al administrador en el Gestor de Usuarios.');
   };
 
   const logout = async () => {
@@ -445,6 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // offline logout
     }
+    safeStorage.removeItem('isola_active_user');
     setCurrentUser(null);
   };
 
@@ -625,8 +575,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeModule,
         setActiveModule,
         loginWithEmail,
-        loginWithGoogle,
-        switchUserFast,
         logout,
         addUser,
         updateUser,

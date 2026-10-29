@@ -14,11 +14,15 @@ export function usePWAInstall() {
   useEffect(() => {
     // Check if running in standalone mode (already installed as PWA)
     const checkStandalone = () => {
-      const standaloneQuery = window.matchMedia('(display-mode: standalone)').matches;
-      const navStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-      const standalone = standaloneQuery || navStandalone;
-      setIsStandalone(standalone);
-      setIsInstalled(standalone);
+      try {
+        const standaloneQuery = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(display-mode: standalone)').matches : false;
+        const navStandalone = typeof window !== 'undefined' && (window.navigator as unknown as { standalone?: boolean })?.standalone === true;
+        const standalone = !!(standaloneQuery || navStandalone);
+        setIsStandalone(standalone);
+        setIsInstalled(standalone);
+      } catch {
+        // Fallback for sandboxed iframes
+      }
     };
 
     checkStandalone();

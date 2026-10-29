@@ -23,7 +23,7 @@ import { Role } from '../types';
 export const Navbar: React.FC<{
   onOpenLogin: () => void;
 }> = ({ onOpenLogin }) => {
-  const { currentUser, switchUserFast, logout, activeModule, setActiveModule } = useApp();
+  const { currentUser, logout, activeModule, setActiveModule } = useApp();
   const isOnline = useOnlineStatus();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
@@ -201,29 +201,6 @@ export const Navbar: React.FC<{
                         {currentUser.role}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="px-2 py-1.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-amber-600" /> Cambiar Rol Rápido (Demo/Terreno):
-                    </p>
-                    {(['Administrador', 'Supervisor', 'Surtidor', 'Operador'] as Role[]).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => {
-                          switchUserFast(r);
-                          setRoleDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition ${
-                          currentUser.role === r
-                            ? 'bg-amber-100 text-amber-900 font-bold'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span>{r}</span>
-                        {currentUser.role === r && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
-                      </button>
-                    ))}
                   </div>
 
                   <div className="border-t border-slate-100 pt-1 mt-1">

@@ -22,6 +22,8 @@ import { CombustibleDatabase } from './components/CombustibleDatabase';
 import { EquipoManagement } from './components/EquipoManagement';
 import { UserManagement } from './components/UserManagement';
 import { Dashboard } from './components/Dashboard';
+import { LoginView } from './components/LoginView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useOnlineStatus } from './hooks/usePWAInstall';
 
 const MainLayout: React.FC = () => {
@@ -110,6 +112,11 @@ const MainLayout: React.FC = () => {
       }
     }
   }, [currentUser?.role, activeModule, setActiveModule]);
+
+  // If no user is logged in, show ONLY the full-screen Login view
+  if (!currentUser) {
+    return <LoginView />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-['Inter',sans-serif]">
@@ -226,8 +233,10 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainLayout />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainLayout />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
